@@ -1,0 +1,14 @@
+{
+    "name": "rdp100",
+    "description": "A trivial implementation of Reactive Demand Programming",
+    "version": "1.0.0",
+    "main": "rdp.js",
+    "dependencies": {
+        "chai": "3.0.0"
+    },
+    "devDependencies": {
+    },
+    "scripts": {
+        "test": "node test.js"
+    }
+}
