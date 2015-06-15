@@ -86,10 +86,10 @@ rdp.Signal.prototype.addListener = function(onSignalUpdate, onSignalInactive) {
 rdp.Behavior = function Behavior() {
 }
 
-/// Creates a concrete instance of an behavior that reads data from
-/// the given input signal, and returns the instance's output signal.
-/// The input behavior has to be inactive; its first activation will
-/// start the behavior.
+/// Creates a concrete instance of a behavior that reads data from the
+/// given input signal, and returns the instance's output signal.  The
+/// input behavior has to be inactive; its first activation will start
+/// the behavior.
 rdp.apply = function(b, sigIn) {
     assert.instanceOf(b, rdp.Behavior);
     assert.instanceOf(sigIn, rdp.Signal);
