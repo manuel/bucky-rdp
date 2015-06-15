@@ -1,6 +1,11 @@
 {
-    "name": "rdp100",
+    "name": "bucky-rdp",
     "description": "A trivial implementation of Reactive Demand Programming",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/manuel/bucky-rdp"
+    },
     "version": "1.0.0",
     "main": "rdp.js",
     "dependencies": {
