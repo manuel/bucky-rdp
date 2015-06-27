@@ -26,7 +26,7 @@ and uses the result as the value of its output signal.
 ## Example
 
 ````javascript
-var rdp = require("./rdp.js");
+var rdp = require("bucky-rdp");
 
 // Create some behaviors for transforming numbers.
 var bDouble = rdp.bFMap(function(val) { return val * 2; });
