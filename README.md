@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/manuel/bucky-rdp.svg?branch=master)](https://travis-ci.org/manuel/bucky-rdp)
+
 A trivial implementation of Reactive Demand Programming
 for Node.js and Browserify.
 
