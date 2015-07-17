@@ -30,9 +30,12 @@ rdp.makeSignal = function(onGet) {
 }
 
 /// Retrieves the current value of an active signal.
-rdp.Signal.prototype.getValue = function(cb) {
+/// Options:
+/// options.version indicates that the client has a copy of that version and wants a diff against that.
+/// (Defaults to rdp.NO_VERSION, indicating that the client doesn't have a copy of any version).
+rdp.Signal.prototype.getValue = function(cb, options) {
     assert.isTrue(this.active, "Attempted to get value of inactive signal");
-    return this.onGet(cb);
+    return this.onGet(cb, options);
 }
 
 /// Updates the current value of a signal, activating it if it is
@@ -78,6 +81,39 @@ rdp.Signal.prototype.addListener = function(onSignalUpdate, onSignalInactive) {
     this.emitter.addListener(rdp.SIGNAL_INACTIVE_EVENT, onSignalInactive);
 }
 
+//// Errors
+
+rdp.makeError = function(status) {
+    assert.isString(status);
+    return { rdpStatus: status };
+}
+
+rdp.isRDPError = function(error) {
+    return typeof error.rdpStatus !== "undefined";
+}
+
+rdp.getErrorStatus = function(error) {
+    var status = error.rdpStatus;
+    assert.isString(status);
+    return status;
+}
+
+/// Sent to client when client's copy of value matches server's.
+rdp.NO_CONTENT_STATUS = "204";
+
+rdp.noContentError = function() {
+    return rdp.makeError(rdp.NO_CONTENT_STATUS);
+}
+
+/// Sent to client when server cannot create a diff against a
+/// client-requested version of the value, and the client has to
+/// refetch the whole value.
+rdp.CONFLICT_STATUS = "409";
+
+rdp.conflictError = function() {
+    return rdp.makeError(rdp.CONFLICT_STATUS);
+}
+
 //// Behavior
 
 /// A behavior takes an input signal and emits data in an output
@@ -116,7 +152,7 @@ rdp.bConst = function(val) {
 /// Simply sets the value of its output signal while its input signal
 /// is active.
 rdp.BConst.prototype.rdpApply = function(self, sigIn) {
-    function onGet(cb) {
+    function onGet(cb, options) {
         process.nextTick(function() { cb(null, self.val); });
     }
     var sigOut = rdp.makeSignal(onGet);
@@ -186,7 +222,7 @@ rdp.bFMap = function(fun) {
 
 /// Should be obvious by now.
 rdp.BFMap.prototype.rdpApply = function(self, sigIn) {
-    function onGet(cb) {
+    function onGet(cb, options) {
         sigIn.getValue(function(err, val) {
             if (err) {
                 cb(err);
