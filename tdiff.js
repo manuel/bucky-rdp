@@ -24,9 +24,26 @@ tdiff.makeDiff = function() {
     return new tdiff.Diff();
 }
 
-tdiff.Diff.prototype.put = function(key, change) {
+tdiff.Diff.prototype.getChange = function(key) {
+    return this.get("changes").get(key);
+}
+
+tdiff.Diff.prototype.hasChange = function(key) {
+    return this.get("changes").has(key);
+}
+
+tdiff.Diff.prototype.putChange = function(key, change) {
     assert.instanceOf(change, tdiff.Change);
     return this.setIn(["changes", key], change);
+}
+
+tdiff.Diff.prototype.removeChange = function(key) {
+    return this.deleteIn(["changes", key]);
+}
+
+tdiff.Diff.prototype.forEachChange = function(fn) {
+    assert.isFunction(fn);
+    return this.get("changes").forEach(fn);
 }
 
 tdiff.change = function(rem, add) {
@@ -45,6 +62,26 @@ tdiff.NO_CHANGE = tdiff.change(tdiff.NO_MOD, tdiff.NO_MOD);
 
 /// Modify a base diff by applying a patch diff to it.
 tdiff.mergeDiffs = function(base, patch) {
+    assert.instanceOf(base, tdiff.Diff);
+    assert.instanceOf(patch, tdiff.Diff);
+    var res = base;
+    patch.forEachChange(function(patchChg, key) {
+        if (base.hasChange(key)) {
+            var baseChg = base.getChange(key);
+            var mergedChg = tdiff.mergeChanges(baseChg, patchChg);
+            if (imm.is(mergedChg, tdiff.NO_CHANGE)) {
+                // Patch change cancelled out base change, remove it.
+                res = res.removeChange(key);
+            } else {
+                // Put merged change created from base and patch change.
+                res = res.putChange(key, mergedChg);
+            }
+        } else {
+            // Base doesn't have patch change, add it.
+            res = res.putChange(key, patchChg);
+        }
+    });
+    return res;
 }
 
 /// Modify a base change by applying a patch change to it.
