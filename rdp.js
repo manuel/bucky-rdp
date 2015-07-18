@@ -4,10 +4,12 @@
 var rdp = module.exports;
 // Manages callbacks
 var EventEmitter = require("events").EventEmitter;
+var imm = require("immutable");
 // Provides assert
 var chai = require("chai");
 var assert = chai.assert;
 chai.config.includeStack = true; // Print stacktrace when assertion fails
+var tdiff = require("./tdiff.js");
 
 //// Signal
 
@@ -29,12 +31,20 @@ rdp.makeSignal = function(onGet) {
     return new rdp.Signal(onGet);
 }
 
+/// Returns a signal that always returns null.
+rdp.makeNullSignal = function() {
+    return rdp.makeSignal(function(cb) { process.nextTick(function() { cb(null, null); }); });
+}
+
 /// Retrieves the current value of an active signal.
 /// Options:
 /// options.version indicates that the client has a copy of that version and wants a diff against that.
 /// (Defaults to rdp.NO_VERSION, indicating that the client doesn't have a copy of any version).
 rdp.Signal.prototype.getValue = function(cb, options) {
     assert.isTrue(this.active, "Attempted to get value of inactive signal");
+    if (typeof options === "undefined") {
+        options = {};
+    }
     return this.onGet(cb, options);
 }
 
@@ -79,6 +89,21 @@ rdp.Signal.prototype.addListener = function(onSignalUpdate, onSignalInactive) {
     assert.isFunction(onSignalInactive, "onSignalInactive");
     this.emitter.addListener(rdp.SIGNAL_UPDATE_EVENT, onSignalUpdate);
     this.emitter.addListener(rdp.SIGNAL_INACTIVE_EVENT, onSignalInactive);
+}
+
+//// Pages
+
+rdp.Page = imm.Record({
+    patch: null
+});
+
+rdp.makePage = function(patch) {
+    assert.instanceOf(patch, tdiff.Diff);
+    return new rdp.Page({ patch: patch });
+}
+
+rdp.Page.prototype.getPatch = function() {
+    return this.get("patch");
 }
 
 //// Errors
@@ -153,7 +178,9 @@ rdp.bConst = function(val) {
 /// is active.
 rdp.BConst.prototype.rdpApply = function(self, sigIn) {
     function onGet(cb, options) {
-        process.nextTick(function() { cb(null, self.val); });
+        process.nextTick(function() {
+            cb(null, self.val);
+        });
     }
     var sigOut = rdp.makeSignal(onGet);
     function onSignalUpdate() {
@@ -241,3 +268,4 @@ rdp.BFMap.prototype.rdpApply = function(self, sigIn) {
     sigIn.addListener(onSignalUpdate, onSignalInactive);
     return sigOut;
 }
+
