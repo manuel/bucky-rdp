@@ -17,7 +17,6 @@ sigOut.getValue(function(err, val) {
     if (err) {
         throw err;
     } else {
-        console.log(val);
         assert.equal(val, 3);
         THE_VAL = 4;
         sigIn.update();
@@ -25,7 +24,6 @@ sigOut.getValue(function(err, val) {
             if (err) {
                 throw err;
             } else {
-                console.log(val);
                 assert.equal(val, 7);
             }
         });
