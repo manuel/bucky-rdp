@@ -4,41 +4,54 @@
 var rdp = module.exports;
 // Manages callbacks
 var EventEmitter = require("events").EventEmitter;
+var imm = require("immutable");
 // Provides assert
 var chai = require("chai");
 var assert = chai.assert;
 chai.config.includeStack = true; // Print stacktrace when assertion fails
+var tdiff = require("./tdiff.js");
 
 //// Signal
 
 /// A carrier for a discretely updating value.
-rdp.Signal = function Signal() {
+rdp.Signal = function Signal(onGet) {
+    assert.isFunction(onGet);
     // A signal is either active (carrying a value) or inactive.
     this.active = false;
-    // The current value (when active).
-    this.val = null;
+    // Called when a client wants to retrieve the current value.
+    this.onGet = onGet;
     // Callbacks for behaviors listening to changes of this signal.
     this.emitter = new EventEmitter();
 }
 
 /// Creates a new inactive signal.  This is the only way to create a
-/// signal.  The first signal update with `setValue' will activate the
+/// signal.  The first signal update with `update' will activate the
 /// signal.
-rdp.makeSignal = function() {
-    return new rdp.Signal();
+rdp.makeSignal = function(onGet) {
+    return new rdp.Signal(onGet);
 }
 
-/// Returns the current value of an active signal.
-rdp.Signal.prototype.getValue = function() {
+/// Returns a signal that always returns null.
+rdp.makeNullSignal = function() {
+    return rdp.makeSignal(function(cb) { process.nextTick(function() { cb(null, null); }); });
+}
+
+/// Retrieves the current value of an active signal.
+/// Options:
+/// options.version indicates that the client has a copy of that version and wants a diff against that.
+/// (Defaults to rdp.NO_VERSION, indicating that the client doesn't have a copy of any version).
+rdp.Signal.prototype.getValue = function(cb, options) {
     assert.isTrue(this.active, "Attempted to get value of inactive signal");
-    return this.val;
+    if (typeof options === "undefined") {
+        options = {};
+    }
+    return this.onGet(cb, options);
 }
 
 /// Updates the current value of a signal, activating it if it is
 /// inactive.  Notifies downstream behaviors of the change.
-rdp.Signal.prototype.setValue = function(newVal) {
+rdp.Signal.prototype.update = function() {
     this.active = true;
-    this.val = newVal;
     this.emitSignalUpdate();
 }
 
@@ -47,7 +60,6 @@ rdp.Signal.prototype.setValue = function(newVal) {
 rdp.Signal.prototype.deactivate = function() {
     assert.isTrue(this.active, "Attempted deactivation of already inactive signal");
     this.active = false;
-    this.val = null;
     this.emitSignalInactive();
 }
 
@@ -77,6 +89,54 @@ rdp.Signal.prototype.addListener = function(onSignalUpdate, onSignalInactive) {
     assert.isFunction(onSignalInactive, "onSignalInactive");
     this.emitter.addListener(rdp.SIGNAL_UPDATE_EVENT, onSignalUpdate);
     this.emitter.addListener(rdp.SIGNAL_INACTIVE_EVENT, onSignalInactive);
+}
+
+//// Pages
+
+rdp.Page = imm.Record({
+    patch: null
+});
+
+rdp.makePage = function(patch) {
+    assert.instanceOf(patch, tdiff.Diff);
+    return new rdp.Page({ patch: patch });
+}
+
+rdp.Page.prototype.getPatch = function() {
+    return this.get("patch");
+}
+
+//// Errors
+
+rdp.makeError = function(status) {
+    assert.isString(status);
+    return { rdpStatus: status };
+}
+
+rdp.isRDPError = function(error) {
+    return typeof error.rdpStatus !== "undefined";
+}
+
+rdp.getErrorStatus = function(error) {
+    var status = error.rdpStatus;
+    assert.isString(status);
+    return status;
+}
+
+/// Sent to client when client's copy of value matches server's.
+rdp.NO_CONTENT_STATUS = "204";
+
+rdp.noContentError = function() {
+    return rdp.makeError(rdp.NO_CONTENT_STATUS);
+}
+
+/// Sent to client when server cannot create a diff against a
+/// client-requested version of the value, and the client has to
+/// refetch the whole value.
+rdp.CONFLICT_STATUS = "409";
+
+rdp.conflictError = function() {
+    return rdp.makeError(rdp.CONFLICT_STATUS);
 }
 
 //// Behavior
@@ -117,9 +177,14 @@ rdp.bConst = function(val) {
 /// Simply sets the value of its output signal while its input signal
 /// is active.
 rdp.BConst.prototype.rdpApply = function(self, sigIn) {
-    var sigOut = rdp.makeSignal();
+    function onGet(cb, options) {
+        process.nextTick(function() {
+            cb(null, self.val);
+        });
+    }
+    var sigOut = rdp.makeSignal(onGet);
     function onSignalUpdate() {
-        sigOut.setValue(self.val);
+        sigOut.update();
     }
     function onSignalInactive() {
         sigOut.deactivate();
@@ -184,9 +249,18 @@ rdp.bFMap = function(fun) {
 
 /// Should be obvious by now.
 rdp.BFMap.prototype.rdpApply = function(self, sigIn) {
-    var sigOut = rdp.makeSignal();
+    function onGet(cb, options) {
+        sigIn.getValue(function(err, val) {
+            if (err) {
+                cb(err);
+            } else {
+                cb(null, self.fun(val));
+            }
+        });
+    }
+    var sigOut = rdp.makeSignal(onGet);
     function onSignalUpdate() {
-        sigOut.setValue(self.fun(sigIn.getValue()));
+        sigOut.update();
     }
     function onSignalInactive() {
         sigOut.deactivate();
@@ -194,3 +268,4 @@ rdp.BFMap.prototype.rdpApply = function(self, sigIn) {
     sigIn.addListener(onSignalUpdate, onSignalInactive);
     return sigOut;
 }
+

@@ -9,7 +9,8 @@
     "version": "1.0.1",
     "main": "rdp.js",
     "dependencies": {
-        "chai": "3.0.0"
+        "chai": "3.0.0",
+        "immutable": "3.7.4"
     },
     "devDependencies": {
     },
