@@ -1,6 +1,7 @@
 var tdiff = require("./tdiff.js");
 var imm = require("immutable");
 var assert = require("chai").assert;
+var assertEqual = require("./util.js").assertEqual;
 
 var diff1 = tdiff.makeDiff();
 var diff2 = tdiff.makeDiff();
@@ -8,12 +9,6 @@ assert.isTrue(imm.is(diff1, diff2));
 
 assert.isTrue(imm.is(diff1.putChange("k1", tdiff.add("foo")).putChange("k2", tdiff.add("bar")),
                      diff2.putChange("k2", tdiff.add("bar")).putChange("k1", tdiff.add("foo"))));
-
-function assertEqual(obj1, obj2) {
-    if (!imm.is(obj1, obj2)) {
-        throw "Expected " + obj1 + " and " + obj2 + " to be equal.";
-    }
-}
 
 assertEqual(tdiff.change("foo", "bar"),
             tdiff.mergeChanges(tdiff.change("foo", "bar"),
